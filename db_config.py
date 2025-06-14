@@ -12,4 +12,5 @@ import os
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 # SQLAlchemy engine using pg8000 as the driver
+DATABASE_URL = os.getenv("DATABASE_URL", "").replace("postgresql://", "postgresql+pg8000://")
 engine = create_engine(DATABASE_URL, echo=False, future=True)
