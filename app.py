@@ -1,11 +1,31 @@
 from flask import Flask, request, jsonify
+import json
 import psycopg2
 from db_config import DB_CONFIG
 
 app = Flask(__name__)
 
+with open("device_auth.json", "r") as f:
+    AUTH_WHITELIST = json.load(f)
+
+def check_device_auth():
+    device_id = request.headers.get("X-Device-ID")
+    api_key = request.headers.get("X-API-Key")
+    if not device_id or not api_key:
+        return False, "Missing headers"
+    
+    valid_key = AUTH_WHITELIST.get(device_id)
+    if valid_key != api_key:
+        return False, "Unauthorized device"
+    
+    return True, None
+
 @app.route('/api/park', methods=['POST'])
 def park():
+    auth_status, msg = check_device_auth()
+    if not auth_status:
+        return jsonify({"error": msg}), 403
+    
     data = request.json
     rfid = data.get('rfid')
     username = data.get('username')
@@ -57,6 +77,10 @@ def park():
 
 @app.route('/api/unpark', methods=['POST'])
 def unpark():
+    auth_status, msg = check_device_auth()
+    if not auth_status:
+        return jsonify({"error": msg}), 403
+    
     rfid = request.json.get('rfid')
     if not rfid:
         return jsonify({"error": "Missing RFID"}), 400
@@ -96,6 +120,10 @@ def unpark():
 
 @app.route('/api/status', methods=['GET'])
 def status():
+    auth_status, msg = check_device_auth()
+    if not auth_status:
+        return jsonify({"error": msg}), 403
+
     conn = None
     try:
         conn = psycopg2.connect(**DB_CONFIG)
@@ -118,6 +146,10 @@ def status():
 
 @app.route('/api/query_user', methods=['POST'])
 def query_user():
+    auth_status, msg = check_device_auth()
+    if not auth_status:
+        return jsonify({"error": msg}), 403
+
     rfid = request.json.get('rfid')
     if not rfid:
         return jsonify({"error": "Missing RFID"}), 400
@@ -158,7 +190,26 @@ def query_user():
             cursor.close()
             conn.close()
 
+@app.route('/api/users', methods=['GET'])
+def list_users():
+    auth_status, msg = check_device_auth()
+    if not auth_status:
+        return jsonify({"error": msg}), 403
 
+    conn = None
+    try:
+        conn = psycopg2.connect(**DB_CONFIG)
+        cursor = conn.cursor()
+        cursor.execute("SELECT username, rfid FROM user_info ORDER BY username")
+        data = cursor.fetchall()
+        result = [{"username": row[0], "rfid": row[1]} for row in data]
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            cursor.close()
+            conn.close()
 if __name__ == '__main__':
     import os
     port = int(os.environ.get("PORT", 5050))
