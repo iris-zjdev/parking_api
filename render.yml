@@ -1,7 +1,7 @@
 services:
   - type: web
-    name: parking-api
-    env: python
+    name: parking-api-1
+    runtime: python
     buildCommand: ""
     startCommand: python app.py
     plan: free
