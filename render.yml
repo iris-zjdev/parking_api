@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: parking-api-1
+    name: parking_api
     runtime: python
     buildCommand: ""
     startCommand: python app.py
