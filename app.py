@@ -200,16 +200,33 @@ def list_users():
     try:
         conn = psycopg2.connect(**DB_CONFIG)
         cursor = conn.cursor()
-        cursor.execute("SELECT username, rfid FROM user_info ORDER BY username")
+
+        cursor.execute("""
+            SELECT u.username, u.rfid, s.spot_id
+            FROM user_info u
+            LEFT JOIN spot s ON u.car_id = s.occupied_car_id
+            ORDER BY u.username
+        """)
         data = cursor.fetchall()
-        result = [{"username": row[0], "rfid": row[1]} for row in data]
+
+        result = [
+            {
+                "rfid": row[1],
+                "username": row[0],
+                "is_parked": row[2] is not None,
+                "spot_id": row[2]
+            }
+            for row in data
+        ]
         return jsonify(result)
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
         if conn:
             cursor.close()
             conn.close()
+
 if __name__ == '__main__':
     import os
     port = int(os.environ.get("PORT", 5050))
